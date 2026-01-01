@@ -266,8 +266,6 @@ HKCR:\steamlink
 ### Need Help?
 
 - **Discord:** [https://discord.gg/Ks9Ssgem](https://discord.gg/Ks9Ssgem)
-- **Issues:** Report bugs in the [Issues](https://github.com/usercat280297/sushiTool-Steam-Downgrader/issues) tab
-- **Wiki:** Check our [Wiki](https://github.com/usercat280297/sushiTool-Steam-Downgrader/wiki) for guides
 
 ### Contributing
 
@@ -305,10 +303,6 @@ If this tool helped you, please give it a ⭐ on GitHub!
 It helps others find the tool and motivates us to keep improving it.
 
 ## 📊 Stats
-
-![GitHub stars](https://img.shields.io/github/stars/usercat280297/sushiTool-Steam-Downgrader?style=social)
-![GitHub forks](https://img.shields.io/github/forks/usercat280297/sushiTool-Steam-Downgrader?style=social)
-![GitHub issues](https://img.shields.io/github/issues/usercat280297/sushiTool-Steam-Downgrader)
 
 ---
 
