@@ -8,7 +8,7 @@ Complete Steam management tool with deep registry cleanup and version switching.
 
 **Open PowerShell as Administrator and run:**
 ```powershell
-irm https://raw.githubusercontent.com/YOUR_USERNAME/steam-deep-clean/main/SteamDeepClean.ps1 | iex
+irm https://raw.githubusercontent.com/usercat280297/sushiTool-Steam-Downgrader/main/SteamDeepClean.ps1 | iex
 ```
 
 ## ✨ Features
