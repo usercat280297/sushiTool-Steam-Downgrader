@@ -157,57 +157,96 @@ function Install-Steam32Bit {
     
     foreach ($url in $urls) {
         Write-Host "  [INFO] Trying: $url" -ForegroundColor Yellow
+        Write-Host ""
         
         try {
-            # Dùng WebClient với timeout dài hơn
-            $webClient = New-Object System.Net.WebClient
-            $webClient.Headers.Add("User-Agent", "Mozilla/5.0")
+            # Phương pháp 1: BITS Transfer (có progress bar)
+            Write-Host "  [METHOD 1] Using BITS Transfer..." -ForegroundColor Cyan
             
-            # Progress handler
-            $webClient.DownloadProgressChanged += {
-                $percent = $_.ProgressPercentage
-                if ($percent -gt 0) {
-                    Write-Progress -Activity "Downloading Steam 32-bit" -Status "$percent% Complete" -PercentComplete $percent
-                }
-            }
+            Import-Module BitsTransfer -ErrorAction Stop
             
-            # Download với async
-            $webClient.DownloadFileAsync($url, $tempZip)
+            $job = Start-BitsTransfer -Source $url -Destination $tempZip -DisplayName "Steam 32-bit" -Description "Downloading..." -Asynchronous
             
-            # Đợi download hoàn thành (timeout 5 phút)
-            $timeout = 300
+            $lastPercent = -1
+            $timeout = 300 # 5 phút
             $elapsed = 0
-            while ($webClient.IsBusy -and $elapsed -lt $timeout) {
-                Start-Sleep -Seconds 1
+            
+            while (($job.JobState -eq 'Transferring' -or $job.JobState -eq 'Connecting') -and $elapsed -lt $timeout) {
+                $job = Get-BitsTransfer -JobId $job.JobId
+                
+                if ($job.BytesTotal -gt 0) {
+                    $percent = [int](($job.BytesTransferred / $job.BytesTotal) * 100)
+                    
+                    if ($percent -ne $lastPercent) {
+                        $downloaded = [math]::Round($job.BytesTransferred / 1MB, 2)
+                        $total = [math]::Round($job.BytesTotal / 1MB, 2)
+                        
+                        $bar = '█' * [math]::Floor($percent / 2)
+                        $space = '░' * (50 - [math]::Floor($percent / 2))
+                        
+                        Write-Host "`r  [$bar$space] $percent% ($downloaded MB / $total MB)" -NoNewline -ForegroundColor Cyan
+                        $lastPercent = $percent
+                    }
+                }
+                
+                Start-Sleep -Milliseconds 500
                 $elapsed++
             }
             
-            $webClient.Dispose()
+            Write-Host ""
             
-            # Kiểm tra file đã tải xong chưa
-            if (Test-Path $tempZip) {
-                $fileSize = (Get-Item $tempZip).Length / 1MB
-                Write-Host "  [SUCCESS] Downloaded! Size: $([math]::Round($fileSize, 2)) MB" -ForegroundColor Green
+            if ($job.JobState -eq 'Transferred') {
+                Complete-BitsTransfer -BitsJob $job
+                Write-Host "  [SUCCESS] Download complete!" -ForegroundColor Green
                 $downloadSuccess = $true
                 break
+            } elseif ($job.JobState -eq 'Error') {
+                Remove-BitsTransfer -BitsJob $job
+                throw "BITS transfer failed"
             }
             
         } catch {
-            Write-Host "  [ERROR] Failed: $_" -ForegroundColor Red
+            Write-Host "  [WARNING] BITS method failed: $_" -ForegroundColor Yellow
+            Write-Host ""
             
-            # Thử phương pháp thứ 2: Invoke-WebRequest
+            # Phương pháp 2: Invoke-WebRequest
             try {
-                Write-Host "  [INFO] Trying alternative method..." -ForegroundColor Yellow
+                Write-Host "  [METHOD 2] Using WebRequest..." -ForegroundColor Cyan
+                
                 $ProgressPreference = 'SilentlyContinue'
-                Invoke-WebRequest -Uri $url -OutFile $tempZip -UseBasicParsing -TimeoutSec 300
+                $webRequest = Invoke-WebRequest -Uri $url -OutFile $tempZip -UseBasicParsing -TimeoutSec 300 -PassThru
                 
                 if (Test-Path $tempZip) {
-                    Write-Host "  [SUCCESS] Download complete!" -ForegroundColor Green
+                    $fileSize = (Get-Item $tempZip).Length / 1MB
+                    Write-Host "  [SUCCESS] Downloaded! Size: $([math]::Round($fileSize, 2)) MB" -ForegroundColor Green
                     $downloadSuccess = $true
                     break
                 }
+                
             } catch {
-                Write-Host "  [ERROR] Alternative method also failed" -ForegroundColor Red
+                Write-Host "  [ERROR] WebRequest method failed: $_" -ForegroundColor Red
+                Write-Host ""
+                
+                # Phương pháp 3: WebClient (fallback cuối cùng)
+                try {
+                    Write-Host "  [METHOD 3] Using WebClient..." -ForegroundColor Cyan
+                    
+                    $webClient = New-Object System.Net.WebClient
+                    $webClient.Headers.Add("User-Agent", "Mozilla/5.0")
+                    $webClient.DownloadFile($url, $tempZip)
+                    $webClient.Dispose()
+                    
+                    if (Test-Path $tempZip) {
+                        $fileSize = (Get-Item $tempZip).Length / 1MB
+                        Write-Host "  [SUCCESS] Downloaded! Size: $([math]::Round($fileSize, 2)) MB" -ForegroundColor Green
+                        $downloadSuccess = $true
+                        break
+                    }
+                    
+                } catch {
+                    Write-Host "  [ERROR] WebClient method failed: $_" -ForegroundColor Red
+                    Write-Host ""
+                }
             }
         }
     }
@@ -223,12 +262,48 @@ function Install-Steam32Bit {
     
     Write-Host ""
     Write-Host "Step 3: Extracting files..." -ForegroundColor Cyan
+    Write-Host "  [INFO] Extracting to: $steamPath" -ForegroundColor Yellow
+    Write-Host ""
     
     try {
         Add-Type -AssemblyName System.IO.Compression.FileSystem
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($tempZip, $steamPath)
+        
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($tempZip)
+        $entries = @($zip.Entries | Where-Object { -not $_.FullName.EndsWith('/') })
+        $total = $entries.Count
+        $count = 0
+        $lastPercent = -1
+        
+        foreach ($entry in $entries) {
+            $count++
+            $destPath = Join-Path $steamPath $entry.FullName
+            $destDir = Split-Path $destPath -Parent
+            
+            if ($destDir -and !(Test-Path $destDir)) {
+                New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+            }
+            
+            try {
+                [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destPath, $true)
+            } catch {
+                # Bỏ qua lỗi file đang được sử dụng
+            }
+            
+            $percent = [int](($count / $total) * 100)
+            if ($percent -ne $lastPercent) {
+                $bar = '█' * [math]::Floor($percent / 2)
+                $space = '░' * (50 - [math]::Floor($percent / 2))
+                Write-Host "`r  [$bar$space] $percent% ($count / $total files)" -NoNewline -ForegroundColor Cyan
+                $lastPercent = $percent
+            }
+        }
+        
+        Write-Host ""
+        $zip.Dispose()
         Write-Host "  [SUCCESS] Extraction complete!" -ForegroundColor Green
+        
     } catch {
+        Write-Host ""
         Write-Host "  [ERROR] Extraction failed: $_" -ForegroundColor Red
         Return-ToMenu
         return
@@ -246,6 +321,7 @@ BootStrapperForceSelfUpdate=disable
 "@ | Out-File -FilePath $steamCfg -Encoding ASCII
     
     Write-Host "  [SUCCESS] Configuration created!" -ForegroundColor Green
+    Write-Host "  Location: $steamCfg" -ForegroundColor White
     Write-Host ""
     
     Write-Host "Step 5: Launching Steam..." -ForegroundColor Cyan
@@ -256,7 +332,6 @@ BootStrapperForceSelfUpdate=disable
     Show-CompletionMessage -InstallType "32-bit"
     Return-ToMenu
 }
-
 function Install-Steam64Bit {
     Clear-Host
     Write-Host ""
