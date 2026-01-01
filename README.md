@@ -287,23 +287,6 @@ This tool modifies Steam installation and registry entries. While we've tested i
 - **Not officially affiliated with Valve**
 - **We're not responsible for any data loss**
 
-## 🎯 Roadmap
-
-- [ ] GUI version with Windows Forms
-- [ ] Support for custom Steam library folders
-- [ ] Automatic game backup before reinstall
-- [ ] Profile backup/restore functionality
-- [ ] Multi-language support
-- [ ] Portable version (no installation)
-
-## ⭐ Star This Repo!
-
-If this tool helped you, please give it a ⭐ on GitHub!
-
-It helps others find the tool and motivates us to keep improving it.
-
-## 📊 Stats
-
 ---
 
 <div align="center">
