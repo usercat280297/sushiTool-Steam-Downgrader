@@ -25,7 +25,7 @@ function Show-Menu {
     Write-Host "         |  `$`$`$`$`$`$ | `$`$  | `$`$ /`$`$_____/| `$`$__  `$`$| `$`$" -ForegroundColor Green
     Write-Host "          \____  `$`$| `$`$  | `$`$|  `$`$`$`$`$`$ | `$`$  \ `$`$| `$`$" -ForegroundColor Green
     Write-Host "          /`$`$  \ `$`$| `$`$  | `$`$ \____  `$`$| `$`$  | `$`$| `$`$" -ForegroundColor Green
-    Write-Host "         |  `$`$`$`$`$`$/|  `$`$`$`$`$`$/ /`$`$`$`$`$`$`$/| `$`$  | `$`$| `$`$" -ForegroundColor Green
+    Write-Host "         |  `$`$`$`$`$/|  `$`$`$`$`$`$/ /`$`$`$`$`$`$/| `$`$  | `$`$| `$`$" -ForegroundColor Green
     Write-Host "          \______/  \______/ |_______/ |__/  |__/|__/" -ForegroundColor Green
     Write-Host ""
     Write-Host "                Steam Version Switcher" -ForegroundColor White
@@ -36,12 +36,80 @@ function Show-Menu {
     Write-Host ""
     Write-Host "  Please select an option:" -ForegroundColor Yellow
     Write-Host ""
+    Write-Host "  [0] Download SteamTool Latest (REQUIRED)" -ForegroundColor Red
     Write-Host "  [1] Downgrade to Steam 32-bit (x86)" -ForegroundColor White
     Write-Host "  [2] Upgrade to Steam 64-bit (x64)" -ForegroundColor White
     Write-Host "  [3] Complete Reinstall (Clean Install - Requires Re-login)" -ForegroundColor White
     Write-Host "  [4] Exit" -ForegroundColor White
     Write-Host ""
     Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host ""
+}
+
+function Download-SteamToolLatest {
+    Clear-Host
+    Write-Host ""
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host "  Download SteamTool Latest" -ForegroundColor Yellow
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  [WARNING] YÊU CẦU BẮT BUỘC!" -ForegroundColor Red
+    Write-Host "  [WARNING] Nếu không cài đặt, công cụ sẽ KHÔNG hoạt động!" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "  [INFO] Đang tải SteamTool phiên bản mới nhất..." -ForegroundColor Yellow
+    Write-Host ""
+    
+    $steamToolUrl = "https://github.com/usercat280297/sushiTool-Steam-Downgrader/releases/download/steamtool/st-setup-1.8.20.exe"
+    $tempInstaller = "$env:TEMP\st-setup-1.8.20.exe"
+    
+    try {
+        Write-Host "  Đang kết nối đến GitHub..." -ForegroundColor Cyan
+        $ProgressPreference = 'SilentlyContinue'
+        Invoke-WebRequest -Uri $steamToolUrl -OutFile $tempInstaller -UseBasicParsing
+        Write-Host "  [SUCCESS] Tải xuống hoàn tất!" -ForegroundColor Green
+        Write-Host ""
+        
+        Write-Host "  [INFO] Đang khởi chạy trình cài đặt..." -ForegroundColor Yellow
+        Write-Host "  Vị trí file: $tempInstaller" -ForegroundColor White
+        Write-Host ""
+        
+        Start-Process -FilePath $tempInstaller -Wait
+        
+        Write-Host ""
+        Write-Host "  [SUCCESS] SteamTool đã được cài đặt!" -ForegroundColor Green
+        Write-Host ""
+        
+        Remove-Item $tempInstaller -Force -ErrorAction SilentlyContinue
+        
+        Write-Host "===============================================================" -ForegroundColor Cyan
+        Write-Host "                  HOÀN THÀNH!" -ForegroundColor Green
+        Write-Host "===============================================================" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "  SteamTool Latest đã được cài đặt thành công" -ForegroundColor White
+        Write-Host "  Bạn có thể tiếp tục sử dụng các tính năng khác" -ForegroundColor White
+        Write-Host ""
+        
+        Return-ToMenu
+        
+    } catch {
+        Write-Host ""
+        Write-Host "  [ERROR] Tải xuống thất bại: $_" -ForegroundColor Red
+        Write-Host "  Vui lòng kiểm tra kết nối internet và thử lại" -ForegroundColor Yellow
+        Write-Host ""
+        
+        Return-ToMenu
+    }
+}
+
+function Return-ToMenu {
+    Write-Host ""
+    Write-Host "  Đang quay về menu trong 5 giây..." -ForegroundColor Cyan
+    
+    for ($i = 5; $i -gt 0; $i--) {
+        Write-Host "  $i..." -ForegroundColor Yellow -NoNewline
+        Start-Sleep -Seconds 1
+    }
+    
     Write-Host ""
 }
 
@@ -81,8 +149,7 @@ function Install-Steam64Bit {
         Write-Host "  [SUCCESS] Steam 64-bit installed successfully!" -ForegroundColor Green
         Write-Host ""
         Show-CompletionMessage -InstallType "64-bit"
-        Start-Sleep -Seconds 5
-        exit
+        Return-ToMenu
     } catch {
         Write-Host ""
         Write-Host "  [WARNING] PowerShell method failed!" -ForegroundColor Yellow
@@ -164,8 +231,7 @@ function Install-Steam64BitOfficial {
     Write-Host ""
     
     Show-CompletionMessage -InstallType "64-bit"
-    Start-Sleep -Seconds 5
-    exit
+    Return-ToMenu
 }
 
 function Complete-Reinstall {
@@ -359,8 +425,7 @@ function Complete-Reinstall {
     Write-Host "===============================================================" -ForegroundColor Cyan
     Write-Host ""
     
-    Start-Sleep -Seconds 10
-    exit
+    Return-ToMenu
 }
 
 function Install-SteamVersion {
@@ -479,8 +544,7 @@ BootStrapperForceSelfUpdate=disable
     Write-Host ""
     
     Show-CompletionMessage -InstallType $InstallType
-    Start-Sleep -Seconds 5
-    exit
+    Return-ToMenu
 }
 
 function Get-SteamPath {
@@ -651,20 +715,20 @@ function Show-CompletionMessage {
 
 while ($true) {
     Show-Menu
-    $choice = Read-Host "  Enter your choice (1/2/3/4)"
+    $choice = Read-Host "  Enter your choice (0/1/2/3/4)"
     
     switch ($choice) {
+        "0" {
+            Download-SteamToolLatest
+        }
         "1" {
             Install-Steam32Bit
-            break
         }
         "2" {
             Install-Steam64Bit
-            break
         }
         "3" {
             Complete-Reinstall
-            break
         }
         "4" {
             Write-Host ""
@@ -675,7 +739,7 @@ while ($true) {
         }
         default {
             Write-Host ""
-            Write-Host "  [ERROR] Invalid choice! Please enter 1, 2, 3, or 4." -ForegroundColor Red
+            Write-Host "  [ERROR] Invalid choice! Please enter 0, 1, 2, 3, or 4." -ForegroundColor Red
             Start-Sleep -Seconds 2
         }
     }
