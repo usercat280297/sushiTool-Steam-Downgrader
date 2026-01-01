@@ -121,10 +121,140 @@ function Install-Steam32Bit {
     Write-Host "===============================================================" -ForegroundColor Cyan
     Write-Host ""
     
+    # Bật TLS 1.2
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    
     $steamUrl = "https://github.com/madoiscool/lt_api_links/releases/download/unsteam/latest32bitsteam.zip"
     $fallbackUrl = "http://files.luatools.work/OneOffFiles/latest32bitsteam.zip"
     
-    Install-SteamVersion -InstallType "32-bit" -SteamUrl $steamUrl -FallbackUrl $fallbackUrl
+    Write-Host "Step 0: Locating Steam installation..." -ForegroundColor Cyan
+    $steamPath = Get-SteamPath
+    
+    if (-not $steamPath) {
+        Write-Host "  [ERROR] Steam installation not found" -ForegroundColor Red
+        Read-Host "Press Enter to exit"
+        return
+    }
+    
+    Write-Host "  [SUCCESS] Steam found at: $steamPath" -ForegroundColor Green
+    Write-Host ""
+    
+    Write-Host "Step 1: Killing all Steam processes..." -ForegroundColor Cyan
+    Stop-SteamProcesses
+    Write-Host "  [SUCCESS] All Steam processes terminated" -ForegroundColor Green
+    Write-Host ""
+    
+    Write-Host "Step 2: Downloading Steam 32-bit..." -ForegroundColor Cyan
+    $tempZip = "$env:TEMP\latest_steam_32bit.zip"
+    
+    # XÓA FILE CŨ NẾU TỒN TẠI
+    if (Test-Path $tempZip) {
+        Remove-Item $tempZip -Force
+    }
+    
+    $downloadSuccess = $false
+    $urls = @($steamUrl, $fallbackUrl)
+    
+    foreach ($url in $urls) {
+        Write-Host "  [INFO] Trying: $url" -ForegroundColor Yellow
+        
+        try {
+            # Dùng WebClient với timeout dài hơn
+            $webClient = New-Object System.Net.WebClient
+            $webClient.Headers.Add("User-Agent", "Mozilla/5.0")
+            
+            # Progress handler
+            $webClient.DownloadProgressChanged += {
+                $percent = $_.ProgressPercentage
+                if ($percent -gt 0) {
+                    Write-Progress -Activity "Downloading Steam 32-bit" -Status "$percent% Complete" -PercentComplete $percent
+                }
+            }
+            
+            # Download với async
+            $webClient.DownloadFileAsync($url, $tempZip)
+            
+            # Đợi download hoàn thành (timeout 5 phút)
+            $timeout = 300
+            $elapsed = 0
+            while ($webClient.IsBusy -and $elapsed -lt $timeout) {
+                Start-Sleep -Seconds 1
+                $elapsed++
+            }
+            
+            $webClient.Dispose()
+            
+            # Kiểm tra file đã tải xong chưa
+            if (Test-Path $tempZip) {
+                $fileSize = (Get-Item $tempZip).Length / 1MB
+                Write-Host "  [SUCCESS] Downloaded! Size: $([math]::Round($fileSize, 2)) MB" -ForegroundColor Green
+                $downloadSuccess = $true
+                break
+            }
+            
+        } catch {
+            Write-Host "  [ERROR] Failed: $_" -ForegroundColor Red
+            
+            # Thử phương pháp thứ 2: Invoke-WebRequest
+            try {
+                Write-Host "  [INFO] Trying alternative method..." -ForegroundColor Yellow
+                $ProgressPreference = 'SilentlyContinue'
+                Invoke-WebRequest -Uri $url -OutFile $tempZip -UseBasicParsing -TimeoutSec 300
+                
+                if (Test-Path $tempZip) {
+                    Write-Host "  [SUCCESS] Download complete!" -ForegroundColor Green
+                    $downloadSuccess = $true
+                    break
+                }
+            } catch {
+                Write-Host "  [ERROR] Alternative method also failed" -ForegroundColor Red
+            }
+        }
+    }
+    
+    if (-not $downloadSuccess) {
+        Write-Host ""
+        Write-Host "  [ERROR] All download attempts failed!" -ForegroundColor Red
+        Write-Host "  Please check your internet connection and try again" -ForegroundColor Yellow
+        Write-Host ""
+        Return-ToMenu
+        return
+    }
+    
+    Write-Host ""
+    Write-Host "Step 3: Extracting files..." -ForegroundColor Cyan
+    
+    try {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($tempZip, $steamPath)
+        Write-Host "  [SUCCESS] Extraction complete!" -ForegroundColor Green
+    } catch {
+        Write-Host "  [ERROR] Extraction failed: $_" -ForegroundColor Red
+        Return-ToMenu
+        return
+    }
+    
+    Remove-Item $tempZip -Force -ErrorAction SilentlyContinue
+    
+    Write-Host ""
+    Write-Host "Step 4: Creating steam.cfg..." -ForegroundColor Cyan
+    $steamCfg = Join-Path $steamPath "steam.cfg"
+    
+    @"
+BootStrapperInhibitAll=enable
+BootStrapperForceSelfUpdate=disable
+"@ | Out-File -FilePath $steamCfg -Encoding ASCII
+    
+    Write-Host "  [SUCCESS] Configuration created!" -ForegroundColor Green
+    Write-Host ""
+    
+    Write-Host "Step 5: Launching Steam..." -ForegroundColor Cyan
+    Start-Process -FilePath "$steamPath\Steam.exe" -ArgumentList "-clearbeta"
+    Write-Host "  [SUCCESS] Steam launched!" -ForegroundColor Green
+    Write-Host ""
+    
+    Show-CompletionMessage -InstallType "32-bit"
+    Return-ToMenu
 }
 
 function Install-Steam64Bit {
