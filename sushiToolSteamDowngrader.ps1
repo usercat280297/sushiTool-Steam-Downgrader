@@ -1,0 +1,682 @@
+# ===================================================================
+# sushiTool - Steam Version Switcher
+# Full PowerShell version with menu
+# Usage: irm https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/SteamDeepClean.ps1 | iex
+# ===================================================================
+
+# Check Administrator privileges
+if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Write-Host ""
+    Write-Host "[ERROR] This script requires Administrator privileges!" -ForegroundColor Red
+    Write-Host "Please right-click PowerShell and select 'Run as Administrator'" -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "Press Enter to exit"
+    exit
+}
+
+function Show-Menu {
+    Clear-Host
+    Write-Host ""
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "           /`$`$`$`$`$`$                      /`$`$       /`$`$" -ForegroundColor Green
+    Write-Host "          /`$`$__  `$`$                    | `$`$      |__/" -ForegroundColor Green
+    Write-Host "         | `$`$  \__/ /`$`$   /`$`$  /`$`$`$`$`$`$`$| `$`$`$`$`$`$`$  /`$`$" -ForegroundColor Green
+    Write-Host "         |  `$`$`$`$`$`$ | `$`$  | `$`$ /`$`$_____/| `$`$__  `$`$| `$`$" -ForegroundColor Green
+    Write-Host "          \____  `$`$| `$`$  | `$`$|  `$`$`$`$`$`$ | `$`$  \ `$`$| `$`$" -ForegroundColor Green
+    Write-Host "          /`$`$  \ `$`$| `$`$  | `$`$ \____  `$`$| `$`$  | `$`$| `$`$" -ForegroundColor Green
+    Write-Host "         |  `$`$`$`$`$`$/|  `$`$`$`$`$`$/ /`$`$`$`$`$`$`$/| `$`$  | `$`$| `$`$" -ForegroundColor Green
+    Write-Host "          \______/  \______/ |_______/ |__/  |__/|__/" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "                Steam Version Switcher" -ForegroundColor White
+    Write-Host ""
+    Write-Host "          Discord: https://discord.gg/Ks9Ssgem" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  Please select an option:" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  [1] Downgrade to Steam 32-bit (x86)" -ForegroundColor White
+    Write-Host "  [2] Upgrade to Steam 64-bit (x64)" -ForegroundColor White
+    Write-Host "  [3] Complete Reinstall (Clean Install - Requires Re-login)" -ForegroundColor White
+    Write-Host "  [4] Exit" -ForegroundColor White
+    Write-Host ""
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host ""
+}
+
+function Install-Steam32Bit {
+    Clear-Host
+    Write-Host ""
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host "  Installing Steam 32-bit" -ForegroundColor Yellow
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host ""
+    
+    $steamUrl = "https://github.com/madoiscool/lt_api_links/releases/download/unsteam/latest32bitsteam.zip"
+    $fallbackUrl = "http://files.luatools.work/OneOffFiles/latest32bitsteam.zip"
+    
+    Install-SteamVersion -InstallType "32-bit" -SteamUrl $steamUrl -FallbackUrl $fallbackUrl
+}
+
+function Install-Steam64Bit {
+    Clear-Host
+    Write-Host ""
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host "  Installing Steam 64-bit (PowerShell Method)" -ForegroundColor Yellow
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  [INFO] Using PowerShell one-liner for 64-bit installation" -ForegroundColor Yellow
+    Write-Host ""
+    Start-Sleep -Seconds 2
+    
+    Write-Host "Step 1: Running PowerShell command..." -ForegroundColor Cyan
+    Write-Host "  Command: irm steam.run | iex" -ForegroundColor White
+    Write-Host ""
+    
+    try {
+        Invoke-Expression (Invoke-RestMethod -Uri "https://steam.run")
+        
+        Write-Host ""
+        Write-Host "  [SUCCESS] Steam 64-bit installed successfully!" -ForegroundColor Green
+        Write-Host ""
+        Show-CompletionMessage -InstallType "64-bit"
+        Start-Sleep -Seconds 5
+        exit
+    } catch {
+        Write-Host ""
+        Write-Host "  [WARNING] PowerShell method failed!" -ForegroundColor Yellow
+        Write-Host "  [INFO] Falling back to official installer method..." -ForegroundColor Yellow
+        Write-Host ""
+        Start-Sleep -Seconds 3
+        Install-Steam64BitOfficial
+    }
+}
+
+function Install-Steam64BitOfficial {
+    Write-Host "Step 0: Locating Steam installation..." -ForegroundColor Cyan
+    $steamPath = Get-SteamPath
+    
+    if (-not $steamPath) {
+        Write-Host "  [ERROR] Steam installation not found" -ForegroundColor Red
+        Read-Host "Press Enter to exit"
+        exit
+    }
+    
+    Write-Host "  [SUCCESS] Steam found at: $steamPath" -ForegroundColor Green
+    Write-Host ""
+    
+    Write-Host "Step 1: Killing all Steam processes..." -ForegroundColor Cyan
+    Stop-SteamProcesses
+    Write-Host "  [SUCCESS] All Steam processes terminated" -ForegroundColor Green
+    Write-Host ""
+    
+    Write-Host "Step 2: Downloading official Steam installer..." -ForegroundColor Cyan
+    Write-Host "  [INFO] Downloading from cdn.cloudflare.steamstatic.com" -ForegroundColor Yellow
+    Write-Host ""
+    
+    $tempInstaller = "$env:TEMP\SteamSetup.exe"
+    
+    try {
+        $ProgressPreference = 'SilentlyContinue'
+        Invoke-WebRequest -Uri 'https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe' -OutFile $tempInstaller -UseBasicParsing
+        Write-Host "  [SUCCESS] Download complete!" -ForegroundColor Green
+    } catch {
+        Write-Host "  [ERROR] Download failed: $_" -ForegroundColor Red
+        Read-Host "Press Enter to exit"
+        exit
+    }
+    
+    Write-Host ""
+    Write-Host "Step 3: Removing 32-bit restriction from registry..." -ForegroundColor Cyan
+    Write-Host "  [INFO] Modifying Steam registry to allow 64-bit..." -ForegroundColor Yellow
+    
+    Remove-ItemProperty -Path "HKCU:\Software\Valve\Steam" -Name "SteamCmdForceX86" -ErrorAction SilentlyContinue
+    Remove-ItemProperty -Path "HKLM:\SOFTWARE\Valve\Steam" -Name "SteamCmdForceX86" -ErrorAction SilentlyContinue
+    Remove-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Valve\Steam" -Name "SteamCmdForceX86" -ErrorAction SilentlyContinue
+    
+    Write-Host "  [SUCCESS] Registry updated" -ForegroundColor Green
+    Write-Host ""
+    
+    Write-Host "Step 4: Installing Steam with 64-bit support..." -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  IMPORTANT: The Steam installer will now run." -ForegroundColor Yellow
+    Write-Host "  Please install to the SAME location: $steamPath" -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "Press Enter to start installation"
+    
+    Start-Process -FilePath $tempInstaller -ArgumentList "/S" -Wait
+    Remove-Item $tempInstaller -Force -ErrorAction SilentlyContinue
+    
+    Write-Host ""
+    Write-Host "  [SUCCESS] Installation complete!" -ForegroundColor Green
+    Write-Host ""
+    
+    Write-Host "Step 5: Launching Steam..." -ForegroundColor Cyan
+    Write-Host "  Executable: $steamPath\Steam.exe" -ForegroundColor White
+    Write-Host ""
+    
+    Start-Process -FilePath "$steamPath\Steam.exe"
+    
+    Write-Host "  [SUCCESS] Steam launched successfully!" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Steam is now running with 64-bit support." -ForegroundColor White
+    Write-Host ""
+    
+    Show-CompletionMessage -InstallType "64-bit"
+    Start-Sleep -Seconds 5
+    exit
+}
+
+function Complete-Reinstall {
+    Clear-Host
+    Write-Host ""
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host "  COMPLETE STEAM REINSTALL (Deep Clean)" -ForegroundColor Yellow
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  [WARNING] This option will:" -ForegroundColor Red
+    Write-Host "  - Backup all .lua files from Steam directory" -ForegroundColor White
+    Write-Host "  - Kill all Steam processes" -ForegroundColor White
+    Write-Host "  - Completely uninstall Steam" -ForegroundColor White
+    Write-Host "  - DEEP CLEAN registry (removes ALL Steam traces)" -ForegroundColor White
+    Write-Host "  - Remove Steam firewall rules" -ForegroundColor White
+    Write-Host "  - Reinstall Steam from official installer" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  [IMPORTANT] You will need to:" -ForegroundColor Yellow
+    Write-Host "  - Re-login to your Steam account" -ForegroundColor White
+    Write-Host "  - Re-download games (game files will be kept if possible)" -ForegroundColor White
+    Write-Host ""
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host ""
+    
+    $confirm = Read-Host "Type YES to continue, or anything else to cancel"
+    
+    if ($confirm -ne "YES") {
+        Write-Host ""
+        Write-Host "  [INFO] Operation cancelled" -ForegroundColor Yellow
+        Start-Sleep -Seconds 2
+        return
+    }
+    
+    Clear-Host
+    Write-Host ""
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host "  Starting Deep Clean Reinstall Process" -ForegroundColor Yellow
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host ""
+    
+    # Step 1: Find Steam
+    Write-Host "Step 1: Locating Steam installation..." -ForegroundColor Cyan
+    $steamPath = Get-SteamPath
+    
+    if (-not $steamPath) {
+        Write-Host "  [ERROR] Steam installation not found" -ForegroundColor Red
+        Read-Host "Press Enter to exit"
+        exit
+    }
+    
+    Write-Host "  [SUCCESS] Steam found at: $steamPath" -ForegroundColor Green
+    Write-Host ""
+    
+    # Step 2: Backup .lua files
+    Write-Host "Step 2: Backing up .lua files..." -ForegroundColor Cyan
+    $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+    $backupPath = "$env:USERPROFILE\Desktop\SteamBackup_Lua_$timestamp"
+    New-Item -ItemType Directory -Path $backupPath -Force | Out-Null
+    
+    Write-Host "  [INFO] Searching for .lua files in: $steamPath" -ForegroundColor Yellow
+    Write-Host ""
+    
+    $luaFiles = Get-ChildItem -Path $steamPath -Filter *.lua -Recurse -ErrorAction SilentlyContinue
+    $count = 0
+    
+    foreach ($file in $luaFiles) {
+        try {
+            $relativePath = $file.FullName.Substring($steamPath.Length).TrimStart('\')
+            $destFile = Join-Path $backupPath $relativePath
+            $destDir = Split-Path $destFile -Parent
+            
+            if (!(Test-Path $destDir)) {
+                New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+                Start-Sleep -Milliseconds 50
+            }
+            
+            Copy-Item -Path $file.FullName -Destination $destFile -Force
+            $count++
+            Write-Host "  Backed up: $($file.Name)" -ForegroundColor Cyan
+        } catch {
+            Write-Host "  [WARNING] Failed to backup $($file.Name)" -ForegroundColor Yellow
+        }
+    }
+    
+    Write-Host ""
+    if ($count -gt 0) {
+        Write-Host "  [SUCCESS] Backed up $count .lua files to:" -ForegroundColor Green
+        Write-Host "  $backupPath" -ForegroundColor White
+    } else {
+        Write-Host "  [INFO] No .lua files found to backup" -ForegroundColor Yellow
+    }
+    Write-Host ""
+    Start-Sleep -Seconds 2
+    
+    # Step 3: Kill Steam processes
+    Write-Host "Step 3: Stopping all Steam processes..." -ForegroundColor Cyan
+    Stop-SteamProcesses
+    Write-Host "  [SUCCESS] All Steam processes terminated" -ForegroundColor Green
+    Write-Host ""
+    
+    # Step 4: Uninstall Steam
+    Write-Host "Step 4: Uninstalling Steam completely..." -ForegroundColor Cyan
+    Write-Host "  [INFO] Running Steam uninstaller..." -ForegroundColor Yellow
+    
+    $uninstaller = Join-Path $steamPath "uninstall.exe"
+    if (Test-Path $uninstaller) {
+        Start-Process -FilePath $uninstaller -ArgumentList "/S" -Wait -NoNewWindow
+        Start-Sleep -Seconds 3
+    }
+    
+    Write-Host ""
+    Write-Host "Step 5: DEEP CLEANING Registry (removing ALL Steam traces)..." -ForegroundColor Cyan
+    Write-Host "  [INFO] This will remove ALL Steam registry entries..." -ForegroundColor Yellow
+    Write-Host ""
+    
+    Deep-CleanRegistry
+    
+    Write-Host ""
+    Start-Sleep -Seconds 2
+    
+    # Step 6: Remove firewall rules
+    Write-Host "Step 6: Removing Steam firewall rules..." -ForegroundColor Cyan
+    netsh advfirewall firewall delete rule name=all program="$steamPath\steam.exe" 2>$null | Out-Null
+    netsh advfirewall firewall delete rule name=all program="$steamPath\steamwebhelper.exe" 2>$null | Out-Null
+    Write-Host "  [SUCCESS] Firewall rules removed" -ForegroundColor Green
+    Write-Host ""
+    
+    # Step 7: Download fresh Steam
+    Write-Host "Step 7: Downloading fresh Steam installer..." -ForegroundColor Cyan
+    $tempInstaller = "$env:TEMP\SteamSetup_Fresh.exe"
+    
+    try {
+        $ProgressPreference = 'SilentlyContinue'
+        Invoke-WebRequest -Uri 'https://cdn.fastly.steamstatic.com/client/installer/SteamSetup.exe' -OutFile $tempInstaller -UseBasicParsing
+        Write-Host "  [SUCCESS] Download complete!" -ForegroundColor Green
+    } catch {
+        Write-Host "  [ERROR] Download failed: $_" -ForegroundColor Red
+        Read-Host "Press Enter to exit"
+        exit
+    }
+    
+    Write-Host ""
+    Write-Host "Step 8: Installing fresh Steam..." -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  [INFO] Steam installer will now run" -ForegroundColor Yellow
+    Write-Host "  [INFO] Please follow the installation wizard" -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "Press Enter to start installation"
+    
+    Start-Process -FilePath $tempInstaller -Wait
+    Remove-Item $tempInstaller -Force -ErrorAction SilentlyContinue
+    
+    Write-Host ""
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host "                     ALL DONE!" -ForegroundColor Green
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "                   _______________" -ForegroundColor Yellow
+    Write-Host "                  /               \" -ForegroundColor Yellow
+    Write-Host "                 /   ~~~~~~~~~~~   \" -ForegroundColor Yellow
+    Write-Host "                |  ~~~~~~~~~~~~~~~  |" -ForegroundColor Yellow
+    Write-Host "                |  ~~~~~~~~~~~~~~~  |" -ForegroundColor Yellow
+    Write-Host "                 \   ~~~~~~~~~~~   /" -ForegroundColor Yellow
+    Write-Host "                  \_______________/" -ForegroundColor Yellow
+    Write-Host "                  |||||||||||||||" -ForegroundColor Yellow
+    Write-Host "                 /                 \" -ForegroundColor Yellow
+    Write-Host "                | o  o  o  o  o  o  |" -ForegroundColor Yellow
+    Write-Host "                |  o  o  o  o  o  o |" -ForegroundColor Yellow
+    Write-Host "                 \                 /" -ForegroundColor Yellow
+    Write-Host "                  \_______________ /" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "         Sushi says: Steam is COMPLETELY clean!" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  [SUCCESS] Deep clean reinstall finished!" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Registry has been completely wiped clean" -ForegroundColor White
+    Write-Host "  All Steam traces have been removed" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  Your .lua files backup location:" -ForegroundColor Yellow
+    Write-Host "  $backupPath" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  Next steps:" -ForegroundColor Yellow
+    Write-Host "  1. Launch Steam" -ForegroundColor White
+    Write-Host "  2. Login to your account" -ForegroundColor White
+    Write-Host "  3. Your games should be detected automatically" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  Discord: https://discord.gg/Ks9Ssgem" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "         Thank you for using sushiTool!" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host ""
+    
+    Start-Sleep -Seconds 10
+    exit
+}
+
+function Install-SteamVersion {
+    param(
+        [string]$InstallType,
+        [string]$SteamUrl,
+        [string]$FallbackUrl
+    )
+    
+    Write-Host "Step 0: Locating Steam installation..." -ForegroundColor Cyan
+    $steamPath = Get-SteamPath
+    
+    if (-not $steamPath) {
+        Write-Host "  [ERROR] Steam installation not found" -ForegroundColor Red
+        Write-Host "  Please ensure Steam is installed on your system." -ForegroundColor Yellow
+        Read-Host "Press Enter to exit"
+        exit
+    }
+    
+    Write-Host "  [SUCCESS] Steam found at: $steamPath" -ForegroundColor Green
+    Write-Host ""
+    Start-Sleep -Seconds 1
+    
+    Write-Host "Step 1: Killing all Steam processes..." -ForegroundColor Cyan
+    Stop-SteamProcesses
+    Write-Host "  [SUCCESS] All Steam processes terminated" -ForegroundColor Green
+    Write-Host ""
+    Start-Sleep -Seconds 1
+    
+    Write-Host "Step 2: Downloading Steam $InstallType..." -ForegroundColor Cyan
+    Write-Host "  [INFO] Connecting to server..." -ForegroundColor Yellow
+    Write-Host ""
+    
+    $tempZip = "$env:TEMP\latest_steam.zip"
+    
+    try {
+        $ProgressPreference = 'SilentlyContinue'
+        Invoke-WebRequest -Uri $SteamUrl -OutFile $tempZip -UseBasicParsing
+        Write-Host "  [SUCCESS] Download complete!" -ForegroundColor Green
+    } catch {
+        Write-Host "  [WARNING] Primary download failed, trying fallback..." -ForegroundColor Yellow
+        try {
+            Invoke-WebRequest -Uri $FallbackUrl -OutFile $tempZip -UseBasicParsing
+            Write-Host "  [SUCCESS] Download complete (fallback)!" -ForegroundColor Green
+        } catch {
+            Write-Host "  [ERROR] All downloads failed!" -ForegroundColor Red
+            Read-Host "Press Enter to exit"
+            exit
+        }
+    }
+    
+    Write-Host ""
+    Write-Host "  [INFO] Extracting files to Steam directory..." -ForegroundColor Yellow
+    Write-Host ""
+    
+    try {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($tempZip)
+        $entries = $zip.Entries | Where-Object { -not $_.FullName.EndsWith('/') }
+        $total = $entries.Count
+        $count = 0
+        
+        foreach ($entry in $entries) {
+            $count++
+            $dest = Join-Path $steamPath $entry.FullName
+            $dir = Split-Path $dest -Parent
+            
+            if ($dir -and !(Test-Path $dir)) {
+                New-Item -ItemType Directory -Path $dir -Force | Out-Null
+            }
+            
+            try {
+                [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $dest, $true)
+            } catch {}
+            
+            $percent = [int](($count / $total) * 100)
+            Write-Progress -Activity "Extracting Steam files" -Status "$percent% Complete" -PercentComplete $percent
+        }
+        
+        $zip.Dispose()
+        Write-Host "  [SUCCESS] Extraction complete!" -ForegroundColor Green
+    } catch {
+        Write-Host "  [ERROR] Extraction failed!" -ForegroundColor Red
+        Read-Host "Press Enter to exit"
+        exit
+    }
+    
+    Remove-Item $tempZip -Force -ErrorAction SilentlyContinue
+    
+    Write-Host ""
+    Start-Sleep -Seconds 1
+    
+    Write-Host "Step 3: Creating steam.cfg file..." -ForegroundColor Cyan
+    $steamCfg = Join-Path $steamPath "steam.cfg"
+    
+    @"
+BootStrapperInhibitAll=enable
+BootStrapperForceSelfUpdate=disable
+"@ | Out-File -FilePath $steamCfg -Encoding ASCII
+    
+    Write-Host "  [SUCCESS] steam.cfg created!" -ForegroundColor Green
+    Write-Host "  Location: $steamCfg" -ForegroundColor White
+    Write-Host ""
+    Start-Sleep -Seconds 1
+    
+    Write-Host "Step 4: Launching Steam..." -ForegroundColor Cyan
+    Write-Host "  Executable: $steamPath\Steam.exe" -ForegroundColor White
+    Write-Host "  Arguments: -clearbeta" -ForegroundColor White
+    Write-Host ""
+    
+    Start-Process -FilePath "$steamPath\Steam.exe" -ArgumentList "-clearbeta"
+    
+    Write-Host "  [SUCCESS] Steam launched successfully!" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Steam is now running with $InstallType version." -ForegroundColor White
+    Write-Host ""
+    
+    Show-CompletionMessage -InstallType $InstallType
+    Start-Sleep -Seconds 5
+    exit
+}
+
+function Get-SteamPath {
+    $steamPath = $null
+    
+    try {
+        $steamPath = (Get-ItemProperty -Path "HKCU:\Software\Valve\Steam" -Name "SteamPath" -ErrorAction Stop).SteamPath
+    } catch {
+        try {
+            $steamPath = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Valve\Steam" -Name "InstallPath" -ErrorAction Stop).InstallPath
+        } catch {
+            try {
+                $steamPath = (Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Valve\Steam" -Name "InstallPath" -ErrorAction Stop).InstallPath
+            } catch {}
+        }
+    }
+    
+    if (-not $steamPath) {
+        $possiblePaths = @(
+            "C:\Program Files (x86)\Steam",
+            "C:\Program Files\Steam",
+            "D:\Steam",
+            "E:\Steam"
+        )
+        
+        foreach ($path in $possiblePaths) {
+            if (Test-Path "$path\steam.exe") {
+                $steamPath = $path
+                break
+            }
+        }
+    }
+    
+    if ($steamPath) {
+        $steamPath = $steamPath.Replace('/', '\')
+    }
+    
+    return $steamPath
+}
+
+function Stop-SteamProcesses {
+    $processes = @('steam', 'steamservice', 'steamwebhelper', 'steamerrorreporter', 'streaming_client', 'steamtool', 'gameoverlayui', 'SteamHelper')
+    
+    foreach ($proc in $processes) {
+        Get-Process -Name $proc -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    }
+    
+    Start-Sleep -Seconds 2
+    
+    try {
+        Stop-Service -Name "Steam Client Service" -Force -ErrorAction SilentlyContinue
+        sc.exe delete "Steam Client Service" 2>$null | Out-Null
+    } catch {}
+}
+
+function Deep-CleanRegistry {
+    Write-Host "  [INFO] Starting deep registry cleanup..." -ForegroundColor Yellow
+    
+    $registryPaths = @(
+        'HKCU:\Software\Valve',
+        'HKCU:\Software\Classes\steam',
+        'HKCU:\Software\Classes\steamlink',
+        'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Steam',
+        'HKLM:\SOFTWARE\Valve',
+        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam',
+        'HKLM:\SOFTWARE\Classes\steam',
+        'HKLM:\SOFTWARE\Classes\steamlink',
+        'HKLM:\SOFTWARE\WOW6432Node\Valve',
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Steam',
+        'HKCR:\steam',
+        'HKCR:\steamlink',
+        'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.steam'
+    )
+    
+    $cleanedCount = 0
+    
+    foreach ($path in $registryPaths) {
+        if (Test-Path $path) {
+            try {
+                Remove-Item -Path $path -Recurse -Force -ErrorAction Stop
+                Write-Host "    [DELETED] $path" -ForegroundColor Green
+                $cleanedCount++
+            } catch {
+                Write-Host "    [FAILED] $path" -ForegroundColor Red
+            }
+        }
+    }
+    
+    Write-Host ""
+    Write-Host "  [INFO] Cleaning startup entries..." -ForegroundColor Yellow
+    
+    $runPaths = @(
+        'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run',
+        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run',
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run'
+    )
+    
+    foreach ($runPath in $runPaths) {
+        if (Test-Path $runPath) {
+            try {
+                Remove-ItemProperty -Path $runPath -Name 'Steam' -ErrorAction SilentlyContinue
+            } catch {}
+        }
+    }
+    
+    Write-Host ""
+    Write-Host "  [INFO] Searching for remaining Steam entries..." -ForegroundColor Yellow
+    
+    $searchPaths = @('HKCU:\Software', 'HKLM:\SOFTWARE', 'HKLM:\SOFTWARE\WOW6432Node')
+    
+    foreach ($searchPath in $searchPaths) {
+        if (Test-Path $searchPath) {
+            Get-ChildItem -Path $searchPath -ErrorAction SilentlyContinue | ForEach-Object {
+                if ($_.PSChildName -match 'steam' -or $_.PSChildName -match 'valve') {
+                    try {
+                        Remove-Item -Path $_.PSPath -Recurse -Force -ErrorAction Stop
+                        Write-Host "    [DELETED] $($_.PSPath)" -ForegroundColor Green
+                        $cleanedCount++
+                    } catch {}
+                }
+            }
+        }
+    }
+    
+    Write-Host ""
+    Write-Host "  [SUCCESS] Registry deep clean complete! Removed $cleanedCount entries" -ForegroundColor Green
+}
+
+function Show-CompletionMessage {
+    param([string]$InstallType)
+    
+    Write-Host ""
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host "                     ALL DONE!" -ForegroundColor Green
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "                   _______________" -ForegroundColor Yellow
+    Write-Host "                  /               \" -ForegroundColor Yellow
+    Write-Host "                 /   ~~~~~~~~~~~   \" -ForegroundColor Yellow
+    Write-Host "                |  ~~~~~~~~~~~~~~~  |" -ForegroundColor Yellow
+    Write-Host "                |  ~~~~~~~~~~~~~~~  |" -ForegroundColor Yellow
+    Write-Host "                 \   ~~~~~~~~~~~   /" -ForegroundColor Yellow
+    Write-Host "                  \_______________/" -ForegroundColor Yellow
+    Write-Host "                  |||||||||||||||" -ForegroundColor Yellow
+    Write-Host "                 /                 \" -ForegroundColor Yellow
+    Write-Host "                | o  o  o  o  o  o  |" -ForegroundColor Yellow
+    Write-Host "                |  o  o  o  o  o  o |" -ForegroundColor Yellow
+    Write-Host "                 \                 /" -ForegroundColor Yellow
+    Write-Host "                  \_______________ /" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "         Sushi says: Enjoy your Steam $InstallType!" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "       Steam has been switched to $InstallType" -ForegroundColor White
+    Write-Host "       Configuration file has been created" -ForegroundColor White
+    Write-Host "       Steam is now launching..." -ForegroundColor White
+    Write-Host ""
+    Write-Host "       Discord: https://discord.gg/Ks9Ssgem" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "            Thank you for using sushiTool!" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "===============================================================" -ForegroundColor Cyan
+    Write-Host ""
+}
+
+# ===================================================================
+# MAIN EXECUTION
+# ===================================================================
+
+while ($true) {
+    Show-Menu
+    $choice = Read-Host "  Enter your choice (1/2/3/4)"
+    
+    switch ($choice) {
+        "1" {
+            Install-Steam32Bit
+            break
+        }
+        "2" {
+            Install-Steam64Bit
+            break
+        }
+        "3" {
+            Complete-Reinstall
+            break
+        }
+        "4" {
+            Write-Host ""
+            Write-Host "  Exiting... Goodbye! 🍣" -ForegroundColor Cyan
+            Write-Host ""
+            Start-Sleep -Seconds 1
+            exit
+        }
+        default {
+            Write-Host ""
+            Write-Host "  [ERROR] Invalid choice! Please enter 1, 2, 3, or 4." -ForegroundColor Red
+            Start-Sleep -Seconds 2
+        }
+    }
+}
