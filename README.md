@@ -60,9 +60,9 @@ irm https://raw.githubusercontent.com/usercat280297/sushiTool-Steam-Downgrader/m
 ===============================================================
 
   Please select an option:
-
+  [0] Download SteamTool Latest (REQUIRED)
   [1] Downgrade to Steam 32-bit (x86)
-  [2] Upgrade to Steam 64-bit (x64)
+  [2] Upgrade to Steam 64-bit (x64) ( recommended)
   [3] Complete Reinstall (Clean Install - Requires Re-login)
   [4] Exit
 
