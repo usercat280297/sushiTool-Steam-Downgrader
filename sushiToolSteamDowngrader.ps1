@@ -63,38 +63,38 @@ function Download-SteamToolLatest {
     $tempInstaller = "$env:TEMP\st-setup-1.8.20.exe"
     
     try {
-        Write-Host "  Đang kết nối đến GitHub..." -ForegroundColor Cyan
+        Write-Host "  Connecting to GitHub..." -ForegroundColor Cyan
         $ProgressPreference = 'SilentlyContinue'
         Invoke-WebRequest -Uri $steamToolUrl -OutFile $tempInstaller -UseBasicParsing
-        Write-Host "  [SUCCESS] Tải xuống hoàn tất!" -ForegroundColor Green
+        Write-Host "  [SUCCESS] Download sucessfully!" -ForegroundColor Green
         Write-Host ""
         
-        Write-Host "  [INFO] Đang khởi chạy trình cài đặt..." -ForegroundColor Yellow
-        Write-Host "  Vị trí file: $tempInstaller" -ForegroundColor White
+        Write-Host "  [INFO] installing..." -ForegroundColor Yellow
+        Write-Host "  local file: $tempInstaller" -ForegroundColor White
         Write-Host ""
         
         Start-Process -FilePath $tempInstaller -Wait
         
         Write-Host ""
-        Write-Host "  [SUCCESS] SteamTool đã được cài đặt!" -ForegroundColor Green
+        Write-Host "  [SUCCESS] SteamTool has been installed!" -ForegroundColor Green
         Write-Host ""
         
         Remove-Item $tempInstaller -Force -ErrorAction SilentlyContinue
         
         Write-Host "===============================================================" -ForegroundColor Cyan
-        Write-Host "                  HOÀN THÀNH!" -ForegroundColor Green
+        Write-Host "                      DONE !" -ForegroundColor Green
         Write-Host "===============================================================" -ForegroundColor Cyan
         Write-Host ""
-        Write-Host "  SteamTool Latest đã được cài đặt thành công" -ForegroundColor White
-        Write-Host "  Bạn có thể tiếp tục sử dụng các tính năng khác" -ForegroundColor White
+        Write-Host "  SteamTool Latest has been installed sucessfully" -ForegroundColor White
+        Write-Host "  You can continue use other methods" -ForegroundColor White
         Write-Host ""
         
         Return-ToMenu
         
     } catch {
         Write-Host ""
-        Write-Host "  [ERROR] Tải xuống thất bại: $_" -ForegroundColor Red
-        Write-Host "  Vui lòng kiểm tra kết nối internet và thử lại" -ForegroundColor Yellow
+        Write-Host "  [ERROR] Download failed: $_" -ForegroundColor Red
+        Write-Host "  Pls check the internet and re-try" -ForegroundColor Yellow
         Write-Host ""
         
         Return-ToMenu
@@ -103,7 +103,7 @@ function Download-SteamToolLatest {
 
 function Return-ToMenu {
     Write-Host ""
-    Write-Host "  Đang quay về menu trong 5 giây..." -ForegroundColor Cyan
+    Write-Host "  back to menu in 5s..." -ForegroundColor Cyan
     
     for ($i = 5; $i -gt 0; $i--) {
         Write-Host "  $i..." -ForegroundColor Yellow -NoNewline
